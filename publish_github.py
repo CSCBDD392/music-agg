@@ -23,7 +23,7 @@ API = "https://api.github.com"
 SKIP_NAMES = {".git", "__pycache__", ".github-token", "config.local.json",
               "node_modules", ".pkgcache"}
 SKIP_EXT = {".pyc", ".png", ".jpg", ".log", ".zip"}
-DESC = "B 站弹幕点歌机 + 正方形弹幕面板：弹幕点歌 → 酷狗网页版播放；弹幕实时投影到任意窗口/屏幕旁"
+DESC = "三家音乐源聚合：一个输入框同时搜酷狗 / 网易云 / QQ音乐，结果按匹配度混排，点一下就播"
 
 
 def token_of(explicit=""):
@@ -113,6 +113,10 @@ def main():
         print("已新建仓库 %s" % r["html_url"])
     else:
         print("仓库已存在：%s" % r.get("html_url"))
+        if r.get("description") != DESC:
+            req("PATCH", "/repos/%s/%s" % (a.user, a.repo), token,
+                {"description": DESC})
+            print("已更新仓库简介")
 
     st, r = req("GET", "/repos/%s/%s/git/ref/heads/%s" % (a.user, a.repo, a.branch), token)
     if st == 200:
