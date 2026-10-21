@@ -5,5 +5,10 @@
     "kugou": { "enabled": true, "port": 4000 },
     "netease": { "enabled": true, "port": 3000 },
     "qq": { "enabled": true, "port": 3300 }
+  },
+  "site": {
+    "domain": "agg.cscbdd.top",
+    "port": 8808,
+    "title": "三合一音乐站"
   }
 }
