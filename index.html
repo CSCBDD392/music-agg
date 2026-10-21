@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>三家聚合搜索</title>
+<style>
+  :root {
+    --bg: #0f1115; --card: #171a21; --card2: #1e222b; --line: #272c37;
+    --text: #e6e8ee; --dim: #8b93a7; --acc: #4f8cff; --warn: #ffb84d; --ok: #3dd68c;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f5f6f8; --card:#fff; --card2:#f0f2f5; --line:#e3e6ec;
+            --text:#1c1f26; --dim:#69707f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font:15px/1.55 system-ui,"Segoe UI","Microsoft YaHei",sans-serif; }
+  header { padding:22px 20px 0; max-width:880px; margin:0 auto; }
+  h1 { font-size:21px; margin:0 0 4px; font-weight:650; letter-spacing:.3px; }
+  .sub { color:var(--dim); font-size:13px; margin-bottom:16px; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .chip { font-size:12px; padding:3px 10px; border-radius:20px;
+          background:var(--card2); border:1px solid var(--line); color:var(--dim); }
+  .chip.up { color:var(--ok); border-color:#3dd68c44; }
+  .chip.down { color:#ff6b6b; border-color:#ff6b6b44; }
+  .searchbar { display:flex; gap:8px; margin-bottom:18px; }
+  input[type=search] { flex:1; padding:11px 14px; font-size:15px; border-radius:10px;
+      border:1px solid var(--line); background:var(--card); color:var(--text); outline:none; }
+  input[type=search]:focus { border-color:var(--acc); }
+  button { padding:11px 20px; font-size:15px; border-radius:10px; border:0;
+           background:var(--acc); color:#fff; cursor:pointer; font-weight:600; }
+  button:disabled { opacity:.55; cursor:default; }
+  main { max-width:880px; margin:0 auto; padding:0 20px 60px; }
+  .group { margin-bottom:6px; }
+  .src { display:flex; align-items:center; gap:8px; margin:16px 0 6px;
+         font-size:12px; color:var(--dim); letter-spacing:.6px; }
+  .src::after { content:""; flex:1; height:1px; background:var(--line); }
+  .song { display:flex; align-items:center; gap:12px; padding:10px 12px;
+          background:var(--card); border:1px solid var(--line); border-radius:10px;
+          margin-bottom:7px; }
+  .song.playing { border-color:var(--acc); background:var(--card2); }
+  .idx { width:22px; color:var(--dim); font-size:13px; text-align:right; }
+  .meta { flex:1; min-width:0; }
+  .title { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .artist { color:var(--dim); font-size:13px; overflow:hidden;
+            text-overflow:ellipsis; white-space:nowrap; }
+  .dur { color:var(--dim); font-size:12px; font-variant-numeric:tabular-nums; }
+  .play { padding:6px 14px; font-size:13px; border-radius:8px; }
+  .vote { padding:6px 10px; font-size:12px; border-radius:8px; background:transparent;
+          border:1px solid var(--line); color:var(--dim); font-weight:500; }
+  .vote.on { color:var(--acc); border-color:var(--acc); }
+  .empty { text-align:center; color:var(--dim); padding:50px 0; font-size:14px; }
+  footer { position:fixed; left:0; right:0; bottom:0; background:var(--card);
+           border-top:1px solid var(--line); padding:10px 20px; }
+  .player { max-width:880px; margin:0 auto; display:flex; align-items:center; gap:14px; }
+  .np { flex:1; min-width:0; }
+  .np .t { font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis;
+           white-space:nowrap; }
+  .np .a { font-size:12px; color:var(--dim); }
+  audio { width:290px; max-width:42vw; height:34px; }
+  body { padding-bottom:70px; }
+  .tag { font-size:11px; padding:1px 6px; border-radius:5px; background:var(--card2);
+         color:var(--dim); border:1px solid var(--line); margin-left:6px; }
+  .err { color:#ff6b6b; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>三家聚合搜索</h1>
+  <div class="sub">一个输入框，同时搜酷狗 · 网易云 · QQ音乐，结果按匹配度混排</div>
+  <div class="chips" id="chips"></div>
+  <div class="searchbar">
+    <input type="search" id="q" placeholder="歌名 / 歌手，比如：晴天 周杰伦" autofocus>
+    <button id="go">搜索</button>
+  </div>
+</header>
+<main id="list">
+  <div class="empty">输入歌名回车，三家的结果会混在一起</div>
+</main>
+<footer>
+  <div class="player">
+    <div class="np"><div class="t" id="np-t">未播放</div><div class="a" id="np-a"></div></div>
+    <audio id="au" controls preload="none"></audio>
+  </div>
+</footer>
+<script>
+const $ = s => document.querySelector(s);
+let songs = [], playing = -1, plainMode = false;
+
+async function api(path) {
+  const r = await fetch(path);
+  const d = await r.json().catch(() => ({ ok: false, error: "响应不是 JSON" }));
+  if (!r.ok && d.ok !== false) d.ok = false;
+  return d;
+}
+
+function fmt(s) {
+  if (!s) return "";
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+async function loadStatus() {
+  const d = await api("/api/status");
+  if (!d.ok) return;
+  $("#chips").innerHTML = d.sources.map(s =>
+    `<span class="chip ${s.up ? "up" : "down"}">${s.label} ${s.up ? "在线" : "连不上"}</span>`
+  ).join("");
+}
+
+function render() {
+  if (!songs.length) {
+    $("#list").innerHTML = `<div class="empty">三家都没搜到，换个关键词试试？</div>`;
+    return;
+  }
+  let html = "", last = "";
+  songs.forEach((s, i) => {
+    if (s.source !== last && plainMode) {
+      html += `<div class="src">${s.source_label || s.source}</div>`;
+      last = s.source;
+    }
+    html += `<div class="song ${i === playing ? "playing" : ""}">
+      <div class="idx">${i + 1}</div>
+      <div class="meta">
+        <div class="title">${esc(s.title)}${s.is_trial ? '<span class="tag">试听</span>' : ""}</div>
+        <div class="artist">${esc(s.artist)}${s.album ? " · " + esc(s.album) : ""}</div>
+      </div>
+      <div class="dur">${fmt(s.duration)}</div>
+      <button class="play" data-i="${i}">${i === playing ? "暂停" : "播放"}</button>
+    </div>`;
+  });
+  $("#list").innerHTML = html;
+  $("#list").querySelectorAll(".play").forEach(b =>
+    b.onclick = () => playIndex(+b.dataset.i, new Set()));
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"]/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+const LABEL = { kugou: "酷狗", netease: "网易云", qq: "QQ音乐" };
+
+async function playIndex(i, skip) {
+  const s = songs[i];
+  if (playing === i && !$("#au").paused) { $("#au").pause(); render(); return; }
+  $("#np-t").textContent = "正在取直链…";
+  $("#np-a").textContent = s.title + " - " + s.artist;
+  const q = encodeURIComponent(JSON.stringify(s));
+  const sk = encodeURIComponent([...skip].join(","));
+  const d = await api(`/api/resolve?song=${q}&skip=${sk}`);
+  if (!d.url) {
+    // 同源失败就自动换源找同名
+    const src = s.source;
+    if (!skip.has(src) && d.why && !d.tried) {
+      const nd = await api(`/api/resolve?song=${encodeURIComponent(JSON.stringify(
+        Object.assign({}, s, { source: "" })))}&skip=${encodeURIComponent(src)}`);
+      if (nd.url) { d.url = nd.url; d.via = nd.via; d.song = nd.song; }
+    }
+    if (!d.url) {
+      $("#np-t").textContent = "放不了：" + (d.why || "三家里取不到直链");
+      render();
+      return;
+    }
+  }
+  const au = $("#au");
+  au.src = `/api/stream?song=${encodeURIComponent(JSON.stringify(d.song || s))}`;
+  au.play().catch(e => {
+    $("#np-t").textContent = "浏览器拒绝播放：" + e.message;
+  });
+  playing = i;
+  $("#np-t").textContent = (d.song ? d.song.title : s.title)
+    + (d.via && d.via !== s.source ? `（来自${LABEL[d.via] || d.via}）` : "");
+  $("#np-a").textContent = (d.song ? d.song.artist : s.artist) || "";
+  render();
+}
+
+$("#au").onended = () => { playing = -1; render(); $("#np-t").textContent = "播放结束"; };
+$("#au").onerror = () => { $("#np-t").textContent = "音频加载失败，换一首试试"; };
+
+async function doSearch() {
+  const kw = $("#q").value.trim();
+  if (!kw) return;
+  $("#go").disabled = true;
+  $("#list").innerHTML = `<div class="empty">正在同时搜三家…</div>`;
+  const d = await api("/api/search?q=" + encodeURIComponent(kw) + "&n=8");
+  $("#go").disabled = false;
+  if (!d.ok) {
+    $("#list").innerHTML = `<div class="empty err">搜索失败：${esc(d.error)}</div>`;
+    return;
+  }
+  songs = d.songs.map(s => Object.assign({}, s, { source_label: LABEL[s.source] || s.source }));
+  playing = -1;
+  if (!songs.length) { render(); return; }
+  render();
+}
+
+$("#go").onclick = doSearch;
+$("#q").onkeydown = e => { if (e.key === "Enter") doSearch(); };
+loadStatus();
+</script>
+</body>
+</html>
