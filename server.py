@@ -356,9 +356,16 @@ class Handler(BaseHTTPRequestHandler):
         q = urllib.parse.parse_qs(u.query)
         path = u.path
 
-        if path in ("/", "/index.html"):
+        if path in ("/", "/index.html", "/site.html"):
+            with open(os.path.join(HERE, "site.html"), "rb") as f:
+                self._send(200, f.read(), "text/html; charset=utf-8")
+            return
+        if path == "/app":
             with open(os.path.join(HERE, "index.html"), "rb") as f:
                 self._send(200, f.read(), "text/html; charset=utf-8")
+            return
+        if path == "/favicon.ico":
+            self._send(204, b"", "image/x-icon")
             return
         if path == "/api/status":
             self._json({"ok": True, "sources": self.engine.status()})
@@ -439,7 +446,7 @@ def main():
                         format="%(asctime)s %(name)s %(message)s", datefmt="%H:%M:%S")
     ap = argparse.ArgumentParser(description="三家音乐源聚合网站")
     ap.add_argument("--host", default="127.0.0.1", help="默认只听本机；对外用 0.0.0.0")
-    ap.add_argument("--port", type=int, default=8800)
+    ap.add_argument("--port", type=int, default=0, help="默认取 config.site.port，再不行 8808")
     ap.add_argument("--cfg", default=os.path.join(HERE, "config.json"))
     a = ap.parse_args()
 
@@ -452,9 +459,13 @@ def main():
                 log.warning("读配置 %s 失败: %s", p, e)
     Handler.engine = Engine(cfg)
     Handler.cfg = cfg
-    srv = ThreadingHTTPServer((a.host, a.port), Handler)
+    site = cfg.get("site") or {}
+    port = a.port or int(site.get("port") or 8808)
+    srv = ThreadingHTTPServer((a.host, port), Handler)
     srv.daemon_threads = True
-    log.info("聚合搜索已启动：http://%s:%d", a.host, a.port)
+    log.info("聚合搜索已启动：http://%s:%d", a.host, port)
+    if site.get("domain"):
+        log.info("  对外域名：http://%s", site["domain"])
     for st in Handler.engine.status():
         log.info("  %-6s %s", st["label"], "在线" if st["up"] else "连不上")
     try:
