@@ -16,17 +16,27 @@
 
 ## 跑起来
 
-前提：本机有这三个音乐 API 在跑（跟弹幕点歌机用的是同一批）：
+前提：本机有这三个音乐 API 在跑（跟弹幕点歌机用的是同一批）。
 
-| 源 | 默认端口 | 项目 |
-| --- | --- | --- |
-| 酷狗 | `4000` | `KuGouMusicApi`（`node app.js`） |
-| 网易云 | `3000` | `NeteaseCloudMusicApi` / `api-enhanced`（`node app.js`） |
-| QQ音乐 | `3300` | `QQMusicapi`（`node src/server.js`） |
+### 三个 API 的出处
+
+| 源 | 默认端口 | 项目 | 启动命令 | 上游地址 |
+| --- | --- | --- | --- | --- |
+| 酷狗 | `4000` | `KuGouMusicApi` v1.6.0 | `node app.js` | https://github.com/MakcRe/KuGouMusicApi |
+| 网易云 | `3000` | `@neteasecloudmusicapienhanced/api` v4.40.0（`api-enhanced`） | `node app.js` | https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced · 文档 https://neteasecloudmusicapienhanced.js.org/ |
+| QQ音乐 | `3300` | `qqmusic-api-node` v0.1.0（Koa 实现，来源未公开） | `node src/server.js` | 见下方说明 |
+
+三个都是别人写的开源项目，**本仓库不包含它们的源码**，只按 HTTP 调用它们的本地接口。
+各自装好并跑起来之后，端口对不上就改 `config.local.json`（见下）。
+
+> **关于 QQ 音乐这个 API**：本机用的是 `qqmusic-api-node` v0.1.0（Koa + `zzc_sign` 签名 + QIMEI 设备指纹），
+> 作者没有在 README/package.json 里给出上游仓库，所以这里不给链接，免得指向不相干的项目。
+> 如果你想自己搭一个功能接近的，可以参考 https://github.com/jsososo/QQMusicApi （Express 实现，1633★）——
+> **那不是本项目所用的同一份代码，接口路径也不一样**，本站的 `QQSource` 调的是 `/search/byType` 和 `/song/urls`。
 
 ```bat
 python server.py
-:: 打开 http://127.0.0.1:8800
+:: 打开 http://127.0.0.1:8808
 ```
 
 端口跟默认不一样，写进 `config.local.json`（**注意存成无 BOM 的 UTF-8**）：
