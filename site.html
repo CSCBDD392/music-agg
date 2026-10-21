@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>三合一音乐站 · agg.cscbdd.top</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
+<style>
+  :root {
+    --bg:#0b0d12; --card:#151922; --card2:#1c2230; --line:#252c3b;
+    --text:#e8ecf4; --dim:#8790a4; --acc:#5b8cff; --ok:#3dd68c; --warn:#ffb84d;
+    --grad: linear-gradient(135deg,#5b8cff 0%,#a855f7 55%,#ec4899 100%);
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f4f6fa; --card:#fff; --card2:#eef1f7; --line:#e0e5ee;
+            --text:#151922; --dim:#667085; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:15px/1.6 system-ui,"Segoe UI","Microsoft YaHei",sans-serif;
+       min-height:100vh}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(60% 45% at 50% -10%,#5b8cff22 0%,transparent 70%),
+               radial-gradient(40% 30% at 90% 10%,#a855f722 0%,transparent 70%);
+  }
+  .wrap{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:0 20px}
+
+  /* ---- 顶栏 ---- */
+  nav{display:flex;align-items:center;gap:14px;padding:18px 0}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.4px}
+  .logo .mark{width:27px;height:27px;border-radius:8px;background:var(--grad);
+               display:grid;place-items:center;font-size:15px}
+  .navsub{color:var(--dim);font-size:12px;margin-left:auto}
+  .st{display:flex;gap:6px;flex-wrap:wrap}
+  .st span{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--card2);
+           border:1px solid var(--line);color:var(--dim)}
+  .st span.up{color:var(--ok);border-color:#3dd68c44;background:#3dd68c10}
+  .st span.down{color:#ff6b6b;border-color:#ff6b6b44;background:#ff6b6b10}
+
+  /* ---- 主视觉 ---- */
+  .hero{text-align:center;padding:46px 0 30px}
+  .hero h1{margin:0 0 10px;font-size:clamp(30px,6vw,46px);line-height:1.15;
+           font-weight:760;letter-spacing:-.5px;
+           background:var(--grad);-webkit-background-clip:text;
+           background-clip:text;color:transparent}
+  .hero p{margin:0 auto;max-width:560px;color:var(--dim);font-size:15px}
+  .hero .badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+  .hero .badges b{font-weight:600;font-size:12px;padding:4px 11px;border-radius:20px;
+      background:var(--card);border:1px solid var(--line);color:var(--dim)}
+
+  /* ---- 搜索 ---- */
+  .box{max-width:620px;margin:0 auto}
+  .bar{display:flex;gap:10px;background:var(--card);border:1px solid var(--line);
+       border-radius:16px;padding:7px 7px 7px 18px;align-items:center;
+       box-shadow:0 12px 34px -18px #0008;transition:border-color .2s,box-shadow .2s}
+  .bar:focus-within{border-color:var(--acc);box-shadow:0 0 0 4px #5b8cff22,0 12px 34px -18px #0008}
+  .bar input{flex:1;border:0;outline:0;background:transparent;color:var(--text);
+             font-size:16px;padding:8px 0;min-width:0}
+  .bar button{border:0;border-radius:11px;padding:11px 22px;font-size:15px;
+              font-weight:650;color:#fff;background:var(--grad);cursor:pointer;
+              transition:opacity .2s,transform .1s}
+  .bar button:active{transform:scale(.97)}
+  .bar button:disabled{opacity:.5;cursor:default}
+  .hot{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:16px}
+  .hot a{font-size:13px;color:var(--dim);text-decoration:none;padding:4px 12px;
+         border-radius:20px;background:var(--card2);border:1px solid var(--line);
+         cursor:pointer;transition:.15s}
+  .hot a:hover{color:var(--acc);border-color:var(--acc)}
+
+  /* ---- 结果 ---- */
+  main{padding:26px 0 40px}
+  .sec{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--dim);
+       letter-spacing:.6px;margin:0 0 12px}
+  .sec::after{content:"";flex:1;height:1px;background:var(--line)}
+  .song{display:flex;align-items:center;gap:13px;padding:10px 14px;background:var(--card);
+        border:1px solid var(--line);border-radius:12px;margin-bottom:8px;
+        transition:border-color .15s,transform .1s}
+  .song:hover{border-color:#5b8cff66}
+  .song.on{border-color:var(--acc);background:var(--card2)}
+  .no{width:26px;color:var(--dim);font-size:12px;text-align:right;
+      font-variant-numeric:tabular-nums}
+  .mid{flex:1;min-width:0}
+  .ti{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ar{color:var(--dim);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .badge{font-size:10px;padding:1px 7px;border-radius:6px;margin-left:7px;
+         background:var(--card2);border:1px solid var(--line);color:var(--dim);
+         vertical-align:1px;white-space:nowrap}
+  .badge.kg{color:#54b8ff;border-color:#54b8ff44}
+  .badge.ne{color:#ff6b8b;border-color:#ff6b8b44}
+  .badge.qq{color:#4ad991;border-color:#4ad99144}
+  .du{color:var(--dim);font-size:12px;font-variant-numeric:tabular-nums}
+  .pl{padding:7px 16px;font-size:13px;border-radius:9px;border:0;cursor:pointer;
+      background:var(--card2);color:var(--text);font-weight:600;transition:.15s;
+      border:1px solid var(--line)}
+  .pl:hover{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .empty{text-align:center;color:var(--dim);padding:56px 0;font-size:14px}
+  .empty .ic{font-size:40px;display:block;margin-bottom:12px;opacity:.6}
+  .card-note{background:var(--card);border:1px solid var(--line);border-radius:14px;
+             padding:20px 22px;margin-top:30px}
+  .card-note h3{margin:0 0 8px;font-size:14px;font-weight:650}
+  .card-note p{margin:0;color:var(--dim);font-size:13px;line-height:1.7}
+  .card-note p+p{margin-top:10px}
+  .card-note code{background:var(--card2);padding:1px 6px;border-radius:5px;font-size:12px}
+
+  /* ---- 底部播放器 ---- */
+  footer{position:fixed;left:0;right:0;bottom:0;z-index:5;
+         background:color-mix(in srgb,var(--card) 92%,transparent);
+         backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:10px 20px}
+  .pb{max-width:960px;margin:0 auto;display:flex;align-items:center;gap:16px}
+  .np{flex:1;min-width:0}
+  .np .t1{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .np .t2{font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  audio{width:300px;max-width:44vw;height:34px}
+  body{padding-bottom:74px}
+  .err{color:#ff6b6b}
+  @media(max-width:620px){
+    .hero{padding:30px 0 22px}
+    .navsub{display:none}
+    audio{width:150px}
+    .du{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <div class="logo"><span class="mark">🎵</span>三合一音乐站</div>
+    <div class="st" id="st"></div>
+    <div class="navsub">agg.cscbdd.top</div>
+  </nav>
+
+  <section class="hero">
+    <h1>一个框，搜三家</h1>
+    <p>酷狗 · 网易云 · QQ音乐 同时搜索，按匹配度混排。某家放不了，自动换另一家的同名版本。</p>
+    <div class="box">
+      <div class="bar">
+        <input id="q" type="search" placeholder="歌名、歌手，或「歌名 歌手」" autofocus autocomplete="off">
+        <button id="go">搜索</button>
+      </div>
+      <div class="hot" id="hot"></div>
+    </div>
+  </section>
+
+  <main>
+    <div id="out">
+      <div class="empty"><span class="ic">🔎</span>输入歌名回车，三家的结果会混在这里</div>
+    </div>
+  </main>
+
+  <div class="card-note">
+    <h3>这个站怎么工作的</h3>
+    <p>服务器本机上跑着三个音乐接口（酷狗 / 网易云 / QQ音乐）。你敲一次搜索，后端并发问三家，
+       按「标题是否吻合、歌手是否吻合、是不是伴奏翻唱片段」打分排序，再混成一张列表。</p>
+    <p>点播放时才去要真实音频地址：先找原源，拿不到就换另一家搜同名版本顶上来。
+       所有音频都由本机代理转发，所以浏览器不会因为跨域或防盗链放不出来。</p>
+    <p>接口随时可用：<code>/api/search?q=晴天</code> · <code>/api/resolve</code> · <code>/api/stream</code> · <code>/api/status</code></p>
+  </div>
+</div>
+
+<footer>
+  <div class="pb">
+    <div class="np"><div class="t1" id="t1">未播放</div><div class="t2" id="t2"></div></div>
+    <audio id="au" controls preload="none"></audio>
+  </div>
+</footer>
+
+<script>
+const $ = s => document.querySelector(s);
+const LABEL = { kugou: "酷狗", netease: "网易云", qq: "QQ音乐" };
+const CLS   = { kugou: "kg", netease: "ne", qq: "qq" };
+const HOT   = ["晴天 周杰伦", "海阔天空", "起风了", "光年之外", "稻香", "孤勇者"];
+let songs = [], cur = -1;
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = s => s ? Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0") : "";
+
+async function api(p) {
+  try {
+    const r = await fetch(p);
+    return await r.json();
+  } catch (e) {
+    return { ok: false, error: "请求失败：" + e.message };
+  }
+}
+
+(async function initStatus() {
+  const d = await api("/api/status");
+  if (!d.ok) return;
+  $("#st").innerHTML = d.sources.map(s =>
+    `<span class="${s.up ? "up" : "down"}">${s.label} ${s.up ? "在线" : "离线"}</span>`).join("");
+})();
+
+$("#hot").innerHTML = HOT.map(k =>
+  `<a data-k="${esc(k)}">${esc(k)}</a>`).join("");
+$("#hot").onclick = e => {
+  const k = e.target.dataset.k;
+  if (!k) return;
+  $("#q").value = k;
+  search();
+};
+
+function draw() {
+  if (!songs.length) {
+    $("#out").innerHTML = `<div class="empty"><span class="ic">🫥</span>
+      三家都没搜到，换个关键词试试</div>`;
+    return;
+  }
+  const by = {};
+  songs.forEach(s => by[s.source] = (by[s.source] || 0) + 1);
+  const summary = Object.keys(by).map(k => `${LABEL[k] || k} ${by[k]}`).join(" · ");
+  let html = `<div class="sec">共 ${songs.length} 条 · ${summary}</div>`;
+  songs.forEach((s, i) => {
+    html += `<div class="song ${i === cur ? "on" : ""}">
+      <div class="no">${i + 1}</div>
+      <div class="mid">
+        <div class="ti">${esc(s.title)}<span class="badge ${CLS[s.source] || ""}">${LABEL[s.source] || s.source}</span></div>
+        <div class="ar">${esc(s.artist)}${s.album ? " · " + esc(s.album) : ""}</div>
+      </div>
+      <div class="du">${fmt(s.duration)}</div>
+      <button class="pl" data-i="${i}">${i === cur ? "播放中" : "播放"}</button>
+    </div>`;
+  });
+  $("#out").innerHTML = html;
+  $("#out").querySelectorAll(".pl").forEach(b =>
+    b.onclick = () => play(+b.dataset.i));
+}
+
+async function play(i) {
+  const s = songs[i];
+  const au = $("#au");
+  if (i === cur && !au.paused) { au.pause(); $("#t1").textContent = "已暂停"; return; }
+  $("#t1").textContent = "正在取音频地址…";
+  $("#t2").textContent = s.title + " - " + s.artist;
+  const d = await api(`/api/resolve?song=${encodeURIComponent(JSON.stringify(s))}`);
+  let hit = d, used = s;
+  if (!hit.url) {
+    $("#t1").textContent = "放不了：" + (hit.why || "三家里都没有可播的版本");
+    return;
+  }
+  used = hit.song || s;
+  cur = i;
+  au.src = `/api/stream?song=${encodeURIComponent(JSON.stringify(used))}`;
+  try { await au.play(); } catch (e) { $("#t1").textContent = "浏览器拒绝播放：" + e.message; return; }
+  const via = hit.via && hit.via !== s.source ? `（改用${LABEL[hit.via] || hit.via}）` : "";
+  $("#t1").textContent = used.title + via;
+  $("#t2").textContent = (used.artist || "") + (used.album ? " · " + used.album : "");
+  draw();
+}
+
+$("#au").onended = () => { cur = -1; $("#t1").textContent = "播放结束"; $("#t2").textContent = ""; draw(); };
+$("#au").onerror = () => { $("#t1").textContent = "音频加载失败，换一首试试"; };
+
+async function search() {
+  const kw = $("#q").value.trim();
+  if (!kw) return;
+  $("#go").disabled = true;
+  $("#out").innerHTML = `<div class="empty"><span class="ic">⏳</span>正在同时问三家…</div>`;
+  const d = await api("/api/search?q=" + encodeURIComponent(kw) + "&n=8");
+  $("#go").disabled = false;
+  if (!d.ok) { $("#out").innerHTML = `<div class="empty err">${esc(d.error)}</div>`; return; }
+  songs = d.songs || [];
+  cur = -1;
+  draw();
+}
+
+$("#go").onclick = search;
+$("#q").onkeydown = e => { if (e.key === "Enter") search(); };
+draw();
+</script>
+</body>
+</html>
