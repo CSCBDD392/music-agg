@@ -99,6 +99,10 @@ class Source(object):
     def __init__(self, host, port):
         self.base = "http://%s:%s" % (host or "127.0.0.1", port)
         self._up = None
+        self.cookie = ""      # 登录后由 login.MusicLogin 注入
+
+    def _headers(self):
+        return {"Cookie": self.cookie} if self.cookie else {}
 
     def alive(self):
         if self._up is not None:
@@ -126,7 +130,7 @@ class KugouSource(Source):
         # 注意：参数是 keyword（单数）；filter=2 会一条都不给，10 才正常
         q = urllib.parse.urlencode({"keyword": kw, "page": 1, "pagesize": n,
                                     "platform": "WebFilter", "tag": 0, "filter": 10})
-        d = _http("http://songsearch.kugou.com/song_search_v2?" + q)
+        d = _http("http://songsearch.kugou.com/song_search_v2?" + q, headers=self._headers())
         items = ((d.get("data") or {}).get("lists") or [])
         out = []
         for it in items[:n]:
@@ -149,7 +153,7 @@ class KugouSource(Source):
             return None, "缺 FileHash"
         q = urllib.parse.urlencode({"hash": h, "album_id": aid or "",
                                     "free_part": 1})
-        d = _http("%s/song/url?%s" % (self.base, q), timeout=15)
+        d = _http("%s/song/url?%s" % (self.base, q), headers=self._headers(), timeout=15)
         if str(d.get("status")) != "1" and d.get("errcode"):
             return None, d.get("error") or ("错误 %s" % d.get("errcode"))
         urls = (((d.get("data") or {}).get("url")) or [])
@@ -168,7 +172,7 @@ class NeteaseSource(Source):
 
     def search(self, kw, n=6):
         q = urllib.parse.urlencode({"keywords": kw, "limit": n})
-        d = _http("%s/search?%s" % (self.base, q))
+        d = _http("%s/search?%s" % (self.base, q), headers=self._headers())
         items = (((d.get("result") or {}).get("songs")) or [])
         out = []
         for it in items[:n]:
@@ -183,7 +187,8 @@ class NeteaseSource(Source):
         return out
 
     def url(self, song):
-        d = _http("%s/song/url?id=%s" % (self.base, song.get("id")), timeout=15)
+        d = _http("%s/song/url?id=%s" % (self.base, song.get("id")),
+                  headers=self._headers(), timeout=15)
         for it in (d.get("data") or []):
             if it.get("url"):
                 return it["url"], ""
@@ -195,9 +200,11 @@ class QQSource(Source):
 
     def search(self, kw, n=6):
         body = json.dumps({"keyword": kw, "num": n, "type": 0}).encode()
+        hdr = {"Content-Type": "application/json",
+               "User-Agent": UA}
+        hdr.update(self._headers())
         r = urllib.request.Request(self.base + "/search/byType", data=body,
-                                   headers={"Content-Type": "application/json",
-                                            "User-Agent": UA})
+                                   headers=hdr)
         with urllib.request.urlopen(r, timeout=10) as resp:
             d = json.loads(resp.read().decode("utf-8", "replace"))
         body_d = d.get("data") or {}
@@ -218,7 +225,8 @@ class QQSource(Source):
 
     def url(self, song):
         q = urllib.parse.urlencode({"mids": song.get("id")})
-        d = _http("%s/song/urls?%s" % (self.base, q), timeout=15)
+        d = _http("%s/song/urls?%s" % (self.base, q),
+                  headers=self._headers(), timeout=15)
         one = (d.get("data") or {}).get(song.get("id")) or {}
         if one.get("url"):
             return one["url"], ""
@@ -244,6 +252,7 @@ class Engine(object):
                 continue
             self.table[key] = cls(sub.get("host") or host,
                                   sub.get("port") or DEFAULT_PORTS[key])
+        self.login = None      # 由 main() 里挂上 login.MusicLogin
 
     def status(self):
         out = []
@@ -406,6 +415,41 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._json(self.engine.url(song, skip))
             return
+
+        # ---------------- 登录相关 ----------------
+        L = getattr(self.engine, "login", None)
+        if path == "/login" or path == "/api/login/status":
+            if L is None:
+                self._json({"ok": False, "error": "登录模块未加载"}, 501)
+                return
+            self._json({"ok": True, "accounts": L.status()})
+            return
+        if L is not None and path.startswith("/api/login/"):
+            rest = path[len("/api/login/"):]
+            parts = rest.split("/")
+            plat = parts[0] if parts else ""
+            act = "/".join(parts[1:]) if len(parts) > 1 else ""
+            if plat not in ("kugou", "netease", "qq"):
+                self._json({"ok": False, "error": "未知平台"}, 400)
+                return
+            key = (q.get("key") or [None])[0]
+            try:
+                if act == "qr":
+                    fn = getattr(L, plat + "_qr")
+                    self._json(fn())
+                elif act == "check":
+                    fn = getattr(L, plat + "_check")
+                    self._json(fn(key))
+                elif act == "logout":
+                    self._json(L.logout(plat))
+                elif act == "profile":
+                    self._json({"ok": True, "profile": L.profile.get(plat)})
+                else:
+                    self._json({"ok": False, "error": "未知动作"}, 404)
+            except Exception as e:
+                log.warning("登录 %s/%s 失败: %s", plat, act, e)
+                self._json({"ok": False, "error": str(e)}, 500)
+            return
         self._json({"ok": False, "error": "not found"}, 404)
 
     do_POST = do_GET
@@ -459,6 +503,13 @@ def main():
                 log.warning("读配置 %s 失败: %s", p, e)
     Handler.engine = Engine(cfg)
     Handler.cfg = cfg
+    try:
+        import login as login_mod
+        Handler.engine.login = login_mod.MusicLogin(Handler.engine)
+        n_in = sum(1 for c in Handler.engine.login.cookies.values() if c)
+        log.info("登录模块就绪，已有 %d 个账号登录态", n_in)
+    except Exception as e:
+        log.warning("登录模块加载失败（不影响搜索）：%s", e)
     site = cfg.get("site") or {}
     port = a.port or int(site.get("port") or 8808)
     srv = ThreadingHTTPServer((a.host, port), Handler)
